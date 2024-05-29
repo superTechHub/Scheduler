@@ -1,0 +1,28 @@
+# Ensure AWS CLI is installed and configured
+
+# List all S3 buckets
+$buckets = aws s3api list-buckets --query 'Buckets[].Name' --output text
+
+# Initialize an array to hold bucket information
+$bucketInfo = @()
+
+foreach ($bucket in $buckets) {
+    # Get the size of the bucket in GB
+    $sizeBytes = aws s3 ls s3://$bucket --recursive --summarize | Select-String "Total Size: " | ForEach-Object { $_.ToString().Split(": ")[1].Trim() }
+    $sizeGB = [math]::Round($sizeBytes / 1GB, 2)
+    
+    # Get the date of the last modification
+    $lastModified = aws s3 ls s3://$bucket --recursive | Sort-Object -Property LastWriteTime -Descending | Select-Object -First 1 | ForEach-Object { $_.ToString().Split(" ")[0] }
+
+    # Add the bucket info to the array
+    $bucketInfo += [PSCustomObject]@{
+        BucketName = $bucket
+        SizeGB = $sizeGB
+        LastModified = $lastModified
+    }
+}
+
+# Export the bucket info to a CSV file
+$bucketInfo | Export-Csv -Path "s3_bucket_info.csv" -NoTypeInformation
+
+Write-Output "S3 bucket information exported to s3_bucket_info.csv"
